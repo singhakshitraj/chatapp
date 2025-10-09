@@ -1,0 +1,21 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE messages(
+    message_id uuid DEFAULT uuid_generate_v4(),
+    chat_id INT,
+    date_time TIMESTAMP DEFAULT NOW(),
+    message VARCHAR(512),
+    sent_by VARCHAR(64),
+    FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE,
+    FOREIGN KEY(sent_by) REFERENCES users(username) ON DELETE CASCADE,
+    PRIMARY KEY(message_id,chat_id)
+) PARTITION BY HASH (chat_id);
+
+CREATE TABLE messages_one PARTITION OF messages
+FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+CREATE TABLE messages_two PARTITION OF messages
+FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+CREATE TABLE messages_three PARTITION OF messages
+FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+CREATE TABLE messages_four PARTITION OF messages
+FOR VALUES WITH (MODULUS 4, REMAINDER 3);

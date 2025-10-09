@@ -1,0 +1,5 @@
+CREATE TABLE unread_inbox(
+    username VARCHAR(64),
+    message_id uuid,
+    FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE
+);

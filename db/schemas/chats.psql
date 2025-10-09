@@ -1,0 +1,3 @@
+CREATE TABLE chats(
+    chat_id BIGSERIAL PRIMARY KEY
+)
