@@ -18,7 +18,7 @@ def db_connect():
         )
         yield connection
         connection.commit()
-    except psycopg2.OperationalError as e:
+    except psycopg2.DatabaseError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail={'details':'Unable to connect to database.'})
     finally:
         if connection is not None:
