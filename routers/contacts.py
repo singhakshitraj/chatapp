@@ -14,11 +14,11 @@ def contact_list(connection=Depends(db_connect),username=Depends(JWTTokenClass.g
     with connection.cursor() as cursor:
         load_dotenv()
         try:
-            cursor.execute('SELECT * FROM user_chats WHERE username=%s',(username,))
+            cursor.execute('SELECT chat_id FROM user_chats WHERE username=%s',(username,))
             contacts=cursor.fetchall()
             return {'contacts':contacts}
         except BaseException as e:
-            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE,detail={'message':'DB error has occured!'})
+            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE,detail={'message':'DB error has occured!','error':str(e)})
     
 @router.post('/add')
 def add_to_contact(contact:add_contact_validation,connection=Depends(db_connect),username=Depends(JWTTokenClass.get_user),redis=Depends(get_redis)):
@@ -29,9 +29,13 @@ def add_to_contact(contact:add_contact_validation,connection=Depends(db_connect)
             reciever=cursor.fetchone()
             if reciever is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail={'message':'No user with particular username exists.'})
+            if username == contact.username:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail={'message':'Loop Detected!!'})
             cursor.execute('SELECT chat_id FROM user_chats WHERE username=%s INTERSECT SELECT chat_id FROM user_chats WHERE username=%s',(contact.username,username))
             result=cursor.fetchone()
-            if result.get('chat_id',None) is not None:
+            if result is not None:
+                raise psycopg2.errors.UniqueViolation
+            if result is not None and result.get('chat_id',None) is not None:
                 raise psycopg2.errors.UniqueViolation
             cursor.execute('INSERT INTO chats DEFAULT VALUES RETURNING chat_id')
             chat_id=cursor.fetchone().get('chat_id')

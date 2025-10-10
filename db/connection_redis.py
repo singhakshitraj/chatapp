@@ -19,6 +19,7 @@ pool=redis_pool()
 def get_redis():
     try:
         redi=redis.Redis(connection_pool=pool)
+        redi.ping()
         return redi
     except redis.exceptions.RedisError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,detail={'message':'Redis not able to connect!!'})

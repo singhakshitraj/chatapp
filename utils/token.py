@@ -12,7 +12,7 @@ class JWTTokenClass:
     @staticmethod
     def generate_token(user):
         data = {
-            'user':user,
+            'username':user.get('username'),
             'expires_at': str(datetime.now()+timedelta(minutes=int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES'))))
         }
         token=jwt.encode(
@@ -29,7 +29,7 @@ class JWTTokenClass:
             algorithms=[os.environ.get('ALGORITHM')],
             key=os.environ.get('SECRET_KEY')
         )
-        username=data.get('user',{}).get('username')
+        username=data.get('username',{})
         if username is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail='Check JWT Token!!')
         return username
