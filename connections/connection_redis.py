@@ -8,6 +8,7 @@ def redis_pool():
         pool=redis.ConnectionPool(
             host=os.environ.get('REDIS_HOST'),
             port=os.environ.get('REDIS_PORT'),
+            db=0,
             decode_responses=True
         )
         return pool

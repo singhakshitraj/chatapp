@@ -1,7 +1,7 @@
 from fastapi import FastAPI,WebSocket,Depends
 from starlette.websockets import WebSocketClose,WebSocketDisconnect
 from routers import auth,contacts,chat,chats_ws
-from db.connection_redis import get_redis
+from connections.connection_redis import get_redis
 app=FastAPI()
 
 app.include_router(auth.router)

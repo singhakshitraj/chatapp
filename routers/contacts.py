@@ -1,9 +1,9 @@
 from fastapi import APIRouter,HTTPException,status,Depends
-from db.connection_db import db_connect
+from connections.connection_db import db_connect
 from utils.token import JWTTokenClass
 from utils.validation_models import add_contact_validation
 import psycopg2
-from db.connection_redis import get_redis
+from connections.connection_redis import get_redis
 from dotenv import load_dotenv
 router=APIRouter(
     prefix='/contacts'
