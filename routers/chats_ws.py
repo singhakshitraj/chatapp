@@ -18,13 +18,12 @@ async def chat(chat_id:str,websocket:WebSocket,connection=Depends(db_connect),re
     if not token:
         await websocket.close(code=1008)
         return
-    print(username)
     manager.define_participants(redis=redis,chat_id=chat_id)
     try:
         await manager.connect(websocket=websocket,username=username)
         while True:
             data = await websocket.receive_json()
-            await manager.broadcast(message=data,connection=connection,username=username,chat_id=chat_id)
+            await manager.broadcast(message=data,connection=connection,username=username,chat_id=chat_id,redis=redis)
     except WebSocketDisconnect:
         manager.disconnect(websocket=websocket, username=username)
     except Exception:
