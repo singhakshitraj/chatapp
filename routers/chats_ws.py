@@ -1,6 +1,7 @@
 from fastapi import WebSocket, APIRouter, Depends, status, WebSocketDisconnect
+
+from connections.connection_db import db_connect
 from sqlalchemy.orm import Session
-from connections.connection_db import get_db
 from connections.connection_redis import get_redis
 from utils.token import JWTTokenClass
 from connections.ws_connection_manager import ConnectionManager
@@ -12,15 +13,10 @@ router = APIRouter(
 
 manager = ConnectionManager()
 
-@router.websocket('')
-async def chat(
-    chat_id: str,
-    websocket: WebSocket,
-    db: Session = Depends(get_db),
-    redis=Depends(get_redis)
-):
-    token = websocket.query_params.get("token")
 
+@router.websocket('')
+async def chat(chat_id: str, websocket: WebSocket, connection=Depends(db_connect), redis=Depends(get_redis)):
+    token = websocket.query_params.get("token")
     if not token:
         await websocket.close(code=1008)
         return
@@ -31,7 +27,9 @@ async def chat(
         await websocket.close(code=1008)
         return
 
-    manager.define_participants(redis=redis, chat_id=chat_id)
+    # Ensure participants are available even after a Redis restart by
+    # falling back to the DB and repopulating Redis.
+    manager.define_participants(redis=redis, chat_id=chat_id, connection=connection)
 
     try:
         await manager.connect(websocket=websocket, username=username)

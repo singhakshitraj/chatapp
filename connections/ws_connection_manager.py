@@ -1,4 +1,4 @@
-from fastapi import WebSocket, status
+from fastapi import WebSocket, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from utils.validation_models import message_validation
@@ -16,10 +16,30 @@ class ConnectionManager:
         self.active_connections: list[WebSocket] = []
         self.active_users: list[str] = []
         self.participants: list[str] = []
+    
+    def define_participants(self, redis, chat_id: str, connection):
+        """
+        Load participants for a chat.
 
-    def define_participants(self, redis, chat_id):
-        self.participants = (redis.lrange(chat_id, 0, -1) or [])
+        1. Try Redis (fast path).
+        2. On cache miss, read from DB and repopulate Redis.
+        """
+        participants = redis.lrange(chat_id, 0, -1) or []
 
+        if not participants:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    'SELECT username FROM user_chats WHERE chat_id = %s',
+                    (chat_id,)
+                )
+                rows = cursor.fetchall()
+                participants = [row.get('username') for row in rows]
+
+            if participants:
+                redis.lpush(chat_id, *participants)
+
+        self.participants = participants
+        
     async def connect(self, websocket: WebSocket, username: str):
         if username not in self.participants:
             raise WebSocketException(
