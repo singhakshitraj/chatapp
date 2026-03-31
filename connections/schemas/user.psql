@@ -1,5 +1,0 @@
-CREATE TABLE users(
-    username VARCHAR(64) PRIMARY KEY,
-    password VARCHAR(256),
-    email VARCHAR(256) DEFAULT 'akshit.22209@knit.ac.in'
-)

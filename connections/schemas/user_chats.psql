@@ -1,7 +1,0 @@
-CREATE TABLE user_chats(
-    username VARCHAR(64),
-    chat_id INT,
-    FOREIGN KEY(chat_id) REFERENCES chats(chat_id) ON DELETE CASCADE,
-    FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE,
-    PRIMARY KEY(username,chat_id)
-);
