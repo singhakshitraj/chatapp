@@ -9,6 +9,7 @@ from utils.send_email import send_email
 from connections.schemas import Message
 from connections.schemas import UnreadInbox
 from connections.schemas import User
+from connections.schemas import UserChat
 
 
 class ConnectionManager:
@@ -17,7 +18,7 @@ class ConnectionManager:
         self.active_users: list[str] = []
         self.participants: list[str] = []
     
-    def define_participants(self, redis, chat_id: str, connection):
+    def define_participants(self, redis, chat_id: str, connection: Session):
         """
         Load participants for a chat.
 
@@ -27,13 +28,12 @@ class ConnectionManager:
         participants = redis.lrange(chat_id, 0, -1) or []
 
         if not participants:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    'SELECT username FROM user_chats WHERE chat_id = %s',
-                    (chat_id,)
-                )
-                rows = cursor.fetchall()
-                participants = [row.get('username') for row in rows]
+            rows = (
+                connection.query(UserChat.username)
+                .filter(UserChat.chat_id == chat_id)
+                .all()
+            )
+            participants = [row.username for row in rows]
 
             if participants:
                 redis.lpush(chat_id, *participants)

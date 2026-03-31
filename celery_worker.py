@@ -1,10 +1,10 @@
 from celery import Celery
-import os,utils
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-celery_app=Celery(
+celery_app = Celery(
     "worker",
     broker=os.environ.get('REDIS_URL'),
 )

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from fastapi import Depends,status
 from fastapi.exceptions import HTTPException
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='login')
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/login')
 
 class JWTTokenClass:
     @staticmethod
