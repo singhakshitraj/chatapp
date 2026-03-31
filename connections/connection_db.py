@@ -1,25 +1,39 @@
-import psycopg2
-from psycopg2.extras import RealDictCursor
 import os
-from fastapi.exceptions import HTTPException
-from fastapi import status
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from dotenv import load_dotenv
-def db_connect():
-    connection=None
+
+load_dotenv()
+
+DATABASE_URL = (
+    f"postgresql+psycopg2://"
+    f"{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
+    f"@{os.environ['HOST']}:{os.environ['PORT']}"
+    f"/{os.environ['DBNAME']}"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+)
+SessionLocal = sessionmaker(
+    bind=engine,
+    autocommit=False,
+    autoflush=False,
+)
+
+class Base(DeclarativeBase):
+    pass
+
+def get_db():
+    db = SessionLocal()
     try:
-        load_dotenv()
-        connection=psycopg2.connect(
-            host=os.environ.get('HOST'),
-            port=os.environ.get('PORT'),
-            user=os.environ.get('USER'),
-            password=os.environ.get('PASSWORD'),
-            dbname=os.environ.get('DBNAME'),
-            cursor_factory=RealDictCursor
-        )
-        yield connection
-        connection.commit()
-    except psycopg2.DatabaseError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail={'details':'Unable to connect to database.'})
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
-        if connection is not None:
-            connection.close()
+        db.close()

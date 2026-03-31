@@ -1,10 +1,14 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from fastapi.responses import JSONResponse
-from connections.connection_db import db_connect
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from connections.connection_db import get_db
 from connections.connection_redis import get_redis
 from utils.token import JWTTokenClass
 from psycopg2.errors import ReadingSqlDataNotPermitted, DatabaseError
 from utils.validation_models import add_contact_validation
+from connections.schemas import UserChat
+from connections.schemas import Message
 
 router = APIRouter(
     prefix='/chat/{chat_id}'
@@ -110,30 +114,31 @@ def get_messages(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={'message': 'You are not a participant in this chat.'}
         )
-    with connection.cursor() as cursor:
-        try:
-            cursor.execute(
-                '''
-                SELECT message_id,date_time,message,sent_by FROM messages 
-                WHERE chat_id=%s 
-                ORDER BY date_time DESC
-                LIMIT %s OFFSET %s
-                ''',
-                (chat_id, limit, offset)
-            )
-            messages = cursor.fetchall()
-            all_messages = [{
-                'message_id': message.get('message_id'),
-                'datetime': str(message.get('date_time')),
-                'message': message.get('message'),
-                'sent_by': message.get('sent_by')
-            } for message in messages]
-            return JSONResponse(
-                content=all_messages,
-                status_code=status.HTTP_200_OK
-            )
-        except DatabaseError:
-            return JSONResponse(
-                content={'error': 'Unable to fetch data'},
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
+
+    try:
+        messages = (
+            db.query(Message)
+            .filter(Message.chat_id == chat_id)
+            .order_by(Message.date_time.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+        all_messages = [
+            {
+                'message_id': message.message_id,
+                'datetime': str(message.date_time),
+                'message': message.message,
+                'sent_by': message.sent_by
+            }
+            for message in messages
+        ]
+
+        return JSONResponse(content=all_messages, status_code=status.HTTP_200_OK)
+
+    except SQLAlchemyError:
+        return JSONResponse(
+            content={'error': 'Unable to fetch data'},
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
