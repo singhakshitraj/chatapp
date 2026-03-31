@@ -41,7 +41,7 @@ def register(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail={'message': 'User already exists with these credentials', 'suggestion': 'Try logging in'}
+            detail={'message': 'User already exists with this username', 'suggestion': 'Try logging in'}
         )
 
     new_user = User(

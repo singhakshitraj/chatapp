@@ -84,9 +84,7 @@ def get_messages(
     db: Session = Depends(get_db),
     redis=Depends(get_redis)
 ):
-    # Try Redis first
     participants = redis.lrange(chat_id, 0, -1) or []
-
     # On cache miss, load from DB and repopulate Redis
     if not participants:
         with connection.cursor() as cursor:
@@ -99,13 +97,11 @@ def get_messages(
 
         if participants:
             redis.lpush(chat_id, *participants)
-
     if username not in participants:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={'message': 'You are not a participant in this chat.'}
         )
-
     try:
         messages = (
             db.query(Message)
@@ -115,17 +111,15 @@ def get_messages(
             .offset(offset)
             .all()
         )
-
         all_messages = [
             {
-                'message_id': message.message_id,
+                'message_id': str(message.message_id),
                 'datetime': str(message.date_time),
                 'message': message.message,
                 'sent_by': message.sent_by
             }
             for message in messages
         ]
-
         return JSONResponse(content=all_messages, status_code=status.HTTP_200_OK)
 
     except SQLAlchemyError:

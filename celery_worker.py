@@ -1,6 +1,7 @@
 from celery import Celery
 import os
 from dotenv import load_dotenv
+import utils
 
 load_dotenv()
 

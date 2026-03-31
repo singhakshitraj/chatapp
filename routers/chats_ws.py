@@ -39,7 +39,7 @@ async def chat(
     manager.define_participants(redis=redis, chat_id=chat_id, connection=db)
 
     try:
-        await manager.connect(websocket=websocket, username=username)
+        await manager.connect(websocket=websocket, username=username, chat_id=chat_id)
         while True:
             data = await websocket.receive_json()
             message = message_validation(**data)
@@ -51,9 +51,9 @@ async def chat(
                 redis=redis
             )
     except WebSocketDisconnect:
-        manager.disconnect(websocket=websocket, username=username)
+        manager.disconnect(websocket=websocket, username=username, chat_id=chat_id)
     except Exception:
-        manager.disconnect(websocket=websocket, username=username)
+        manager.disconnect(websocket=websocket, username=username, chat_id=chat_id)
         if websocket.application_state == WebSocketState.CONNECTED:
             try:
                 await websocket.close(code=1011)

@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from fastapi import WebSocket, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,11 +13,32 @@ from connections.schemas import User
 from connections.schemas import UserChat
 
 
+@dataclass
+class _ChatRoom:
+    participants: list[str] = field(default_factory=list)
+    active_connections: list[WebSocket] = field(default_factory=list)
+    active_users: list[str] = field(default_factory=list)
+
+
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
-        self.active_users: list[str] = []
-        self.participants: list[str] = []
+        self._rooms: dict[str, _ChatRoom] = {}
+
+    def _room(self, chat_id: str) -> _ChatRoom:
+        chat_id = str(chat_id)
+        room = self._rooms.get(chat_id)
+        if room is None:
+            room = _ChatRoom()
+            self._rooms[chat_id] = room
+        return room
+
+    def _cleanup_room_if_empty(self, chat_id: str) -> None:
+        chat_id = str(chat_id)
+        room = self._rooms.get(chat_id)
+        if room is None:
+            return
+        if not room.active_connections and not room.active_users:
+            self._rooms.pop(chat_id, None)
     
     def define_participants(self, redis, chat_id: str, connection: Session):
         """
@@ -38,23 +60,41 @@ class ConnectionManager:
             if participants:
                 redis.lpush(chat_id, *participants)
 
-        self.participants = participants
+        self._room(chat_id).participants = participants
         
-    async def connect(self, websocket: WebSocket, username: str):
-        if username not in self.participants:
-            raise WebSocketException(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="You are not a participant."
-            )
-        await websocket.accept()
-        self.active_users.append(username)
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket, username: str):
-        if username in self.active_users:
-            self.active_users.remove(username)
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    async def connect(self, websocket: WebSocket, username: str, chat_id: str):
+        room = self._room(chat_id)
+        try:
+            if username not in room.participants:
+                raise WebSocketException(
+                    code=status.WS_1008_POLICY_VIOLATION,
+                    reason="You are not a participant."
+                )
+            await websocket.accept()
+            if username not in room.active_users:
+                room.active_users.append(username)
+            if websocket not in room.active_connections:
+                room.active_connections.append(websocket)
+        except WebSocketException as e:
+            await websocket.close(code=e.code, reason=e.reason)
+            raise e
+            print(e)
+            print('WebSocketException')
+        except Exception as e:
+            await websocket.close(code=status.WS_1006_ABNORMAL_CLOSURE, reason='An unexpected error occurred.')
+            raise e
+            print(e)
+            print('Exception')
+    def disconnect(self, websocket: WebSocket, username: str, chat_id: str):
+        chat_id = str(chat_id)
+        room = self._rooms.get(chat_id)
+        if room is None:
+            return
+        if username in room.active_users:
+            room.active_users.remove(username)
+        if websocket in room.active_connections:
+            room.active_connections.remove(websocket)
+        self._cleanup_room_if_empty(chat_id)
 
     async def broadcast(
         self,
@@ -64,11 +104,11 @@ class ConnectionManager:
         chat_id: str,
         redis
     ):
-        not_active = list(set(self.participants) - set(self.active_users))
+        room = self._room(chat_id)
+        not_active = list(set(room.participants) - set(room.active_users))
 
         try:
-            RedisThrottling.check_validity(username=username)
-
+            #RedisThrottling.check_validity(username=username)
             # Insert the message and flush to get the generated message_id
             new_message = Message(
                 chat_id=chat_id,
@@ -77,12 +117,7 @@ class ConnectionManager:
             )
             db.add(new_message)
             db.flush()
-
-            if new_message.message_id is None:
-                raise WebSocketException(
-                    code=status.WS_1006_ABNORMAL_CLOSURE,
-                    reason='DB insertion failed!'
-                )
+            
 
             # Bulk insert unread inbox entries for offline participants
             db.add_all([
@@ -93,13 +128,16 @@ class ConnectionManager:
             db.commit()
 
             # Broadcast to all active WebSocket connections
-            for connection in self.active_connections:
+            for connection in list(room.active_connections):
                 await connection.send_json({
                     'chat_id': chat_id,
                     'message': message.message,
                     'username': username
                 })
-
+        except SQLAlchemyError as e:
+            db.rollback()
+            print("REAL DB ERROR:", repr(e))
+            raise
         except TooManyRequestError:
             db.rollback()
 
