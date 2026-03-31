@@ -1,4 +1,4 @@
-from fastapi import WebSocket,Depends,status
+from fastapi import WebSocket, Depends, status
 from utils.validation_models import message_validation
 from websockets.exceptions import WebSocketException
 from throttling_redis import RedisThrottling
@@ -7,14 +7,34 @@ from utils.send_email import send_email
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections:list[WebSocket]=[]
-        self.active_users:list[str]=[]
-        self.participants:list[str]=[]
+        self.active_connections: list[WebSocket] = []
+        self.active_users: list[str] = []
+        self.participants: list[str] = []
     
-    def define_participants(self,redis,chat_id):
-        self.participants=(redis.lrange(chat_id,0,-1) or [])
+    def define_participants(self, redis, chat_id: str, connection):
+        """
+        Load participants for a chat.
+
+        1. Try Redis (fast path).
+        2. On cache miss, read from DB and repopulate Redis.
+        """
+        participants = redis.lrange(chat_id, 0, -1) or []
+
+        if not participants:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    'SELECT username FROM user_chats WHERE chat_id = %s',
+                    (chat_id,)
+                )
+                rows = cursor.fetchall()
+                participants = [row.get('username') for row in rows]
+
+            if participants:
+                redis.lpush(chat_id, *participants)
+
+        self.participants = participants
         
-    async def connect(self,websocket:WebSocket,username):
+    async def connect(self, websocket: WebSocket, username: str):
         if username not in self.participants:
             raise WebSocketException(
                 code=status.WS_1008_POLICY_VIOLATION,
