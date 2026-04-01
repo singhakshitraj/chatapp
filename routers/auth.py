@@ -29,7 +29,7 @@ def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
     token = JWTTokenClass.generate_token(user={'username': user.username, 'password': user.password})
     return JSONResponse(
-        content={'username': user.username, 'token': token},
+        content={'username': user.username, 'access_token': token,'token_type':'bearer'},
         status_code=status.HTTP_200_OK
     )
 
@@ -54,6 +54,6 @@ def register(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(
 
     token = JWTTokenClass.generate_token(user={'username': new_user.username, 'password': data.password})
     return JSONResponse(
-        content={'username': new_user.username, 'token': token},
+        content={'username': new_user.username,'access_token': token,'token_type':'bearer'},
         status_code=status.HTTP_201_CREATED
     )
